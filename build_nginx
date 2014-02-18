@@ -21,6 +21,10 @@ NGINX_VERSION="1.5.1"
 NGINX_BASENAME="nginx-${NGINX_VERSION}"
 NGINX_SOURCE="http://nginx.org/download/${NGINX_BASENAME}.tar.gz"
 
+MODSECURITY_VERSION="2.7.7"
+MODSECURITY_BASENAME="modsecurity-apache_${MODSECURITY_VERSION}"
+MODSECURITY_SOURCE="https://www.modsecurity.org/tarball/${MODSECURITY_VERSION}/${MODSECURITY_BASENAME}.tar.gz"
+
 DEBIAN_ROOT="deb"
 DEB_NAME=nginx-passenger
 DEB_LICENSE="2-clause BSD-like license" #from nginx.org
@@ -104,10 +108,25 @@ function cleanup {
 function checkout {
     mkdir -p tmp && pushd tmp
 
+    # Get ngnix
     if [ ! -d $NGINX_BASENAME ]; then
       wget $NGINX_SOURCE
       tar -xvzf "${NGINX_BASENAME}.tar.gz"
     fi
+    
+    # Get modsecurity
+    if [ ! -d $MODSECURITY_BASENAME ]; then
+      wget $MODSECURITY_SOURCE
+      tar -xvzf "${MODSECURITY_BASENAME}.tar.gz"
+    fi
+    
+    # Build modsecurity
+    echo 'Compiling modsecurity...'
+    cd $MODSECURITY_BASENAME 
+    ./configure --enable-standalone-module
+    make
+    sudo make install
+    echo 'modsecurity compiled!'
 }
 
 
@@ -135,6 +154,9 @@ This package includes Passenger ${PASSENGER_VERSION}"
     #findout passenger path
     PASSENGER_GEM_DIR=`passenger-config --root`
     passenger_ext_path="${PASSENGER_GEM_DIR}/ext/nginx"
+    
+    #findout modsecurity path   
+    modsecurity_module_path = "../${MODSECURITY_BASENAME}/nginx/modsecurity"
 
     if [[ ! -d ${passenger_ext_path} ]]; then
       echo "the passenger gem does not seem to be correctly installed, check ${PASSENGER_GEM_DIR}"
@@ -159,7 +181,8 @@ This package includes Passenger ${PASSENGER_VERSION}"
     --with-debug \
     --with-sha1=/usr/include/openssl \
     --with-md5=/usr/include/openssl \
-    --add-module=${passenger_ext_path}"
+    --add-module=${passenger_ext_path} \
+    --add-module=${modsecurity_module_path} "
 
     #for GeoIp module: --with-http_geoip_module
 
